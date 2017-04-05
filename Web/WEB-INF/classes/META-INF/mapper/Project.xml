@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.project.dao.ProjectDao">
+	
+    <!-- 首页房源展示 -->
+	<select id="getIndexProject" resultType="com.caac.house.project.vo.ProjectListVo">
+		SELECT p.ID_ id, p.NAME_ name, p.CITY_ city, p.AREA_ area, p.MIN_PRICE_ minPrice, p.AVERAGE_PRICE_ averagePrice, 
+			p.COMMISSION_ commission, p.VALIDITY_ validity, pe.ADVERTISING_ figure 
+		FROM PROJECT p 
+		JOIN PROJECT_EXTEND pe ON p.ID_ = pe.PROJECT_ID_ 
+		WHERE p.STATUS_ = '0' AND pe.INDEX_ = '1' 
+		ORDER BY pe.IDX_ DESC, p.CREATE_TIME_ DESC 
+	</select>
+    
+	<!-- 房源展示 -->
+	<select id="getProject" resultType="com.caac.house.project.vo.ProjectListVo">
+		SELECT p.ID_ id, p.NAME_ name, p.CITY_ city, p.AREA_ area, p.MIN_PRICE_ minPrice, p.AVERAGE_PRICE_ averagePrice, 
+			p.COMMISSION_ commission, p.VALIDITY_ validity, pe.ADVERTISING_ figure 
+		FROM PROJECT p 
+		JOIN PROJECT_EXTEND pe ON p.ID_ = pe.PROJECT_ID_ 
+		WHERE p.STATUS_ = '0' 
+		ORDER BY pe.IDX_ DESC, p.CREATE_TIME_ DESC 	
+	</select>
+	
+	<!-- 该客户是否被推荐过 -->
+	<select id="getRecommendOrNot" parameterType="com.caac.house.project.entity.ProjectRecommend" resultType="java.lang.Integer">
+	    SELECT COUNT(0) 
+	    FROM PROJECT_RECOMMEND 
+	    WHERE PROJECT_ID_ = #{projectId} and PHONE_ = #{phone} and RECOMMEND_STATUS_ != 3 
+	</select>
+	
+	<!-- 新增推荐 -->
+	<insert id="addRecommend" parameterType="com.caac.house.project.entity.ProjectRecommend">
+	    <selectKey keyProperty="id" order="BEFORE" resultType="java.lang.String">
+	        select UUID()
+	    </selectKey>
+	    insert into PROJECT_RECOMMEND (ID_,PROJECT_ID_,BROKER_ID_,NAME_,PHONE_,NOTE_,TIME_,RECOMMEND_STATUS_,DIRECTION_,ROOM_,PRICE_) values
+	    (#{id},#{projectId},#{brokerId},#{name},#{phone},#{note},now(),#{status},#{direction},#{room},#{price})
+	</insert>
+	
+	<!-- 新增派单 -->
+	<insert id="addSendOrders" parameterType="com.caac.house.project.entity.SendOrders">
+	    insert into SEND_ORDERS (ID_,RECOMMEND_,SUPERVISOR_,SEND_,SEND_TIME_,TYPE_,STATUS_) values
+	    (#{id},#{recommend},#{supervisor},#{send},#{sendTime},'1','0')
+	</insert>
+	
+	<!-- 新增派单记录 -->
+	<insert id="addOrderMark" parameterType="com.caac.house.project.entity.OrderMark">
+        INSERT INTO ORDER_MARK (ID_,RECOMMEND_,ORDER_,SUPERVISOR_,SEND_,SEND_TIME_,TYPE_,LEVEL_,CREATE_TIME_,STATUS_) VALUES
+        (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler},#{recommend},#{order},#{supervisor},#{send},#{sendTime},
+        	'1','0',NOW(),'0')
+    </insert>
+	
+	<!-- 获取指定楼盘信息 -->
+    <select id="getProjectById" resultType="com.caac.house.project.vo.ProjectVo">
+       SELECT p.NAME_ NAME,p.HOUSE_NUM_ houseNum,p.EQUITY_YEAR_ equityYear,p.CARPORT_ carport,p.PLOT_RATIO_ plotRatio,px.FIGURE_ figure,
+       			p.GREENING_RATE_ greeningRate,p.BUILD_ build,p.PERIOD_ period,p.COMMISSION_ commission,pr.bargain,IFNULL(pe.monery,0) monery,
+       			p.MIN_PRICE_ minPrice,p.AVERAGE_PRICE_ averagePrice,p.FLOOR_SPACE_ floorSpace,p.FLOOR_AREA_ floorArea,px.SLOGAN_ slogan, 
+       			p.VALIDITY_ vilidity, p.FITMENT_ fitment, p.DEVELOPER_ developer, p.ADDRESS_ address, p.OPEN_TIME_ openTime, 
+       			p.OCCUPANCY_TIME_ occupancyTime, pt.propertyType  
+	    FROM PROJECT p
+	    LEFT JOIN PROJECT_EXTEND px ON px.PROJECT_ID_ = p.ID_
+	    LEFT JOIN (
+	    	SELECT PROJECT_ID_, GROUP_CONCAT(TYPE_ SEPARATOR  ',') propertyType 
+	        FROM PROPERTY_TYPE 
+	        WHERE PROJECT_ID_ = #{0}
+	        ) pt ON pt.PROJECT_ID_ = p.ID_
+		LEFT JOIN (
+			SELECT pr.PROJECT_ID_,COUNT(0) bargain
+			FROM PROJECT_RECOMMEND pr 
+			LEFT JOIN MAKE_BARGAIN mb ON pr.ID_ = mb.RECOMMEND_ AND mb.STATUS_ = '1'
+			WHERE pr.PROJECT_ID_ = #{0} AND pr.RECOMMEND_STATUS_ = '3'
+			GROUP BY pr.PROJECT_ID_
+			) pr ON pr.PROJECT_ID_ = p.ID_
+		LEFT JOIN (
+			SELECT pr.PROJECT_ID_,SUM(md.MONERY_) monery
+			FROM PROJECT_RECOMMEND pr 
+			LEFT JOIN MONERY_DETAILS md ON md.RECOMMEND_ = pr.ID_ AND md.TYPE_ = '2'
+			WHERE pr.PROJECT_ID_ = #{0} AND pr.RECOMMEND_STATUS_ = '3'
+			GROUP BY pr.PROJECT_ID_
+			) pe ON pe.PROJECT_ID_ = p.ID_
+	        WHERE p.ID_ = #{0} AND p.STATUS_ = '0'
+    </select>
+    
+    <!-- 获取指定楼盘图片 -->
+    <select id="getProjectPic" resultType="com.caac.house.project.entity.ProjectPic">
+        select
+        ID_ id,
+        PROJECT_ID_ projectId,
+        TYPE_ type,
+        ATTACHMENT_ attachment,
+        TITLE_ title,
+        NOTE_ note 
+        from PROJECT_PIC
+        where PROJECT_ID_ = #{0}
+        order by TYPE_ asc
+    </select>
+    
+    <!-- 获取指定图片说明 -->
+    <select id="getImgNote" resultType="com.caac.house.project.entity.ProjectPic">
+        select NOTE_ note
+        from PROJECT_PIC where ATTACHMENT_ = #{0}
+    </select>
+    
+    <!-- 增加浏览次数 -->
+    <update id="updateView">
+        update PROJECT_EXTEND set VIEW_ = VIEW_ + 1 where PROJECT_ID_ = #{0}
+    </update>
+    
+    <!-- 判断该手机号码是否已存在于报备表中 -->
+    <select id="getVisitNum" resultType="java.lang.Integer">
+        SELECT COUNT(0) FROM NATURAL_VISIT WHERE PHONE_ = #{0}
+    </select>
+    
+    <!-- 获取指定楼盘的名称和LOGO -->
+    <select id="getProjectBase" resultType="com.caac.house.project.vo.ProjectBaseVo">
+    	SELECT p.NAME_ name, pe.LOGO_ logo    
+		FROM PROJECT p
+		LEFT JOIN PROJECT_EXTEND pe ON pe.PROJECT_ID_ = p.ID_
+		WHERE p.ID_ = #{0} 
+    </select>
+    
+    <!-- 获取楼盘信息，用于地图 -->
+    <select id="getMap" resultType="com.caac.house.project.vo.MapVo">
+    	SELECT p.NAME_ name, pe.X_ x, pe.Y_ y   
+		FROM PROJECT p 
+		JOIN PROJECT_EXTEND pe ON pe.PROJECT_ID_ = p.ID_ 
+		WHERE p.ID_ = #{0} 
+    </select>
+    
+    <!-- 获取咨询列表的楼盘名称和所属组 -->
+    <select id="getGroupInfo" resultType="com.caac.house.project.vo.GroupInfoVo">
+    	SELECT p.GROUP_ groups, p.NAME_ projName 
+    	FROM PROJECT p 
+    	JOIN (SELECT COUNT(0) total, p.ID_ FROM PROJECT p JOIN FCJ_USER fu ON fu.DEPT_ = p.GROUP_ GROUP BY p.ID_) pf ON pf.ID_ = p.ID_ 
+    	WHERE p.STATUS_ = '0' AND pf.total > 0 
+    </select>
+    
+</mapper>
+

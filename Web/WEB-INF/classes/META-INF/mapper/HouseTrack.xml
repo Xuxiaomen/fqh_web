@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.project.dao.HouseTrackDao">
+
+	<!-- 推荐房源跟进列表 -->
+	<select id="getTracks" parameterType="com.caac.house.project.vo.TrackListVo"
+		resultType="com.caac.house.project.vo.HouseTrackVo">
+		SELECT pr.ID_ id, p.NAME_ project, pr.NAME_ name, pr.PHONE_ phone, pr.TIME_ time, 
+			pr.RECOMMEND_STATUS_ status, pe.LOGO_ logo,os.OS_STATUS_ osStatus,mb.STATUS_ bargainStatus
+		FROM PROJECT_RECOMMEND pr
+		LEFT JOIN PROJECT p ON pr.PROJECT_ID_ = p.ID_
+		LEFT JOIN PROJECT_EXTEND pe ON pe.PROJECT_ID_ = pr.PROJECT_ID_
+		LEFT JOIN (
+			SELECT OS_STATUS_,RECOMMEND_ 
+			FROM (
+				SELECT s.OS_STATUS_,s.RECOMMEND_ 
+				FROM ORDER_SUPERVISOR s 
+				WHERE s.STATUS_ = '1'
+				ORDER BY s.TIME_ DESC) o 
+			GROUP BY o.RECOMMEND_) os ON os.RECOMMEND_ = pr.ID_ AND pr.RECOMMEND_STATUS_ = '2'
+		LEFT JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_ AND pr.RECOMMEND_STATUS_ = '4'
+		WHERE pr.BROKER_ID_ = #{brokerId} 
+		<if test="cond != null and cond != ''">
+			AND (pr.NAME_ LIKE "%"#{cond}"%" OR pr.PHONE_ LIKE "%"#{cond}"%") 
+		</if>
+		<if test="bargain != null and bargain == 0">
+			AND pr.RECOMMEND_STATUS_ &lt; 3
+		</if>
+		<if test="bargain != null and bargain == 1">
+			AND pr.RECOMMEND_STATUS_ = 3
+		</if>
+		<if test="bargain != null and bargain == 2">
+			AND pr.RECOMMEND_STATUS_ = 4
+		</if>
+		<if test="sort != null and sort != ''">
+			ORDER BY ${sort} ${order}
+		</if>
+	</select>
+	
+	<!-- 房源跟进详情 -->
+	<select id="getTrackInfo" resultType="com.caac.house.project.vo.TrackInfoVo">
+		SELECT id, type, status, name, time, orderTime, note, score, userId, logo
+		FROM (
+			SELECT ID_ id, 0 type, '待派单' status, '房亲会' name, TIME_ time, TIME_ orderTime, '' note, NULL score, '' userId, '' logo
+			FROM PROJECT_RECOMMEND 
+			WHERE ID_ = #{0} 
+			UNION  
+			SELECT so.ID_ id, 1 type, so.STATUS_ status, su.NAME_ name, so.SEND_TIME_ time, so.SEND_TIME_ orderTime, 
+				CONCAT('{"name":"',su.NAME_,'","phone":"',su.PHONE_,'"}') note, NULL score, su.ID_ userId, su.LOGO_ logo
+			FROM SEND_ORDERS so 
+			LEFT JOIN FCJ_USER su ON so.SUPERVISOR_ = su.ID_  
+			WHERE so.RECOMMEND_ = #{0} AND su.STATUS_ = '0'
+			UNION 
+			SELECT os.ID_ id, 2 type, os.OS_STATUS_ status, su.NAME_ name, os.TIME_ time, os.TIME_ orderTime, CONTENT_ note,
+				oe.SCORE_ score, su.ID_ userId, su.LOGO_ logo
+			FROM ORDER_SUPERVISOR os 
+			LEFT JOIN FCJ_USER su ON os.USER_ = su.ID_
+			LEFT JOIN ORDER_EVALUATE oe ON oe.LINK_ID_ = os.ID_
+			WHERE os.RECOMMEND_ = #{0} AND os.STATUS_ = '1' AND su.STATUS_ = '0'
+			UNION  
+			SELECT mb.ID_ id, 3 type, '已成交' status, su.NAME_ name, mb.TIME_ time, mb.MODIFY_TIME_ orderTime,  mb.ANALYZE_ note,
+				oe.SCORE_ score, su.ID_ userId, su.LOGO_ logo
+			FROM MAKE_BARGAIN mb 
+			LEFT JOIN FCJ_USER su ON mb.USER_ = su.ID_ 
+			LEFT JOIN ORDER_EVALUATE oe ON oe.LINK_ID_ = mb.ID_
+			WHERE mb.RECOMMEND_ = #{0} AND mb.STATUS_ = '1' AND su.STATUS_ = '0') info 
+		ORDER BY orderTime DESC, type DESC, status DESC 
+	</select>
+	
+	<!-- 获取当前跟单人id -->
+	<select id="getSupervisor" resultType="com.caac.house.project.vo.SupervisorVo">
+		SELECT so.SUPERVISOR_ supervisor, su.LOGO_ logo ,su.NAME_ userName
+		FROM SEND_ORDERS so, FCJ_USER su 
+		WHERE so.SUPERVISOR_ = su.ID_ AND so.RECOMMEND_ = #{0} AND su.STATUS_ = '0'
+	</select>
+	
+	<!-- 获取推荐房源跟进列表数量 -->
+	<select id="getTracksCount" resultType="java.lang.Integer">
+	    SELECT COUNT(0) num FROM PROJECT_RECOMMEND pr WHERE pr.BROKER_ID_ = #{0}
+	</select>
+	
+</mapper>

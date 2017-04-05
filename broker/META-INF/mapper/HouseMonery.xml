@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.broker.dao.HouseMoneryDao">
+	<!-- 新增房币 -->
+	<insert id="save" parameterType="com.caac.house.broker.entity.HouseMonery">
+		<![CDATA[
+			INSERT INTO HOUSE_MONERY (ID_, BROKER_ID_, MONERY_, MONERY_BROKER_, TOTAL_BROKER_) 
+			VALUES(#{id}, #{brokerId}, 888, 888, 888)  
+		]]>
+	</insert>
+	
+	<!-- 新增房币明细 -->
+	<insert id="saveDetails" parameterType="com.caac.house.broker.entity.MoneryDetails">
+		<![CDATA[
+			INSERT INTO MONERY_DETAILS (ID_,MASTER_ID_,TYPE_,MONERY_,GET_TIME_,RECOMMEND_) VALUES 
+			(#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler},#{masterId},#{type},
+				#{monery},NOW(),#{recommend})
+		]]>
+	</insert>
+	
+	<!-- 给指定经纪人增加5点房币 -->
+	<update id="addMoneryByBrokerId">
+		UPDATE HOUSE_MONERY 
+		SET MONERY_ = MONERY_ + 5, MONERY_BROKER_ = MONERY_BROKER_ + 5, TOTAL_BROKER_ = TOTAL_BROKER_ + 5    
+		WHERE BROKER_ID_ = #{0} 
+	</update>
+	
+	<!-- 根据经纪人获取房币主表ID -->
+	<select id="getMoneryIdByBrokerId" resultType="java.lang.String">
+		SELECT 	ID_ 
+		FROM HOUSE_MONERY 
+		WHERE BROKER_ID_ = #{0}
+	</select>	
+	
+	<!-- 获取提现账户金额 -->
+	<select id="getCashAccount" resultType="com.caac.house.broker.vo.CashAccountVo">
+		SELECT MONERY_ monery, MONERY_BROKER_ moneryBroker, TOTAL_BARGAIN_ totalBargain, 
+		    FLOOR(MONERY_BROKER_/100) * 100 + MONERY_BARGAIN_ canCash 
+        FROM HOUSE_MONERY 
+        WHERE BROKER_ID_ = #{0} 
+	</select>
+	
+	<!-- 获取可提现的成交房源信息 -->
+	<select id="getHouseByBargainToCash" resultType="com.caac.house.broker.vo.HouseCashVo">
+		SELECT p.ID_ projectId, p.NAME_ project, mbn.MONERY_ monery, mbn.NO_ no, mbn.BUILDING_ building, md.ID_ id, 
+		    md.MONERY_ bargain, md.GET_TIME_ getTime,  
+			CASE WHEN pr.BROKER_ID_ = hm.BROKER_ID_ THEN 0 ELSE 1 END type, 
+			CASE WHEN pr.BROKER_ID_ = hm.BROKER_ID_ THEN pr.NAME_ ELSE bu.NAME_ END name        
+		FROM MONERY_DETAILS md 
+		JOIN HOUSE_MONERY hm ON hm.ID_ = md.MASTER_ID_ 
+		JOIN PROJECT_RECOMMEND pr ON pr.ID_ = md.RECOMMEND_ 
+		JOIN PROJECT p ON p.ID_ = pr.PROJECT_ID_
+		JOIN MAKE_BARGAIN mbn ON mbn.RECOMMEND_ = pr.ID_ AND mbn.STATUS_ = '1'
+		JOIN BROKER_USER bu ON bu.ID_ = pr.BROKER_ID_  
+		LEFT JOIN (SELECT cd.RECOMMEND_, ec.BROKER_ID_  
+			FROM CASH_DETAILS cd 
+			JOIN EXTRACT_CASH ec ON cd.EXTRACT_CASH_ID_ = ec.ID_ 
+			WHERE ec.TYPE_ IN ('0','3','4')
+		) a ON a.RECOMMEND_ = pr.ID_ AND a.BROKER_ID_ = hm.BROKER_ID_ 
+		WHERE md.TYPE_ = '2' AND a.RECOMMEND_ IS NULL AND hm.BROKER_ID_ = #{0} 
+		ORDER BY p.ID_ ASC, md.GET_TIME_ ASC
+	</select>
+	
+	<!-- 根据ID获取未提现的成交房币明细信息 -->
+	<select id="getDetailsByIds" parameterType="java.util.List" resultType="com.caac.house.broker.vo.DetailsByIdsVo">
+		SELECT md.ID_ id, md.MASTER_ID_ masterId, md.RECOMMEND_ recommend, md.MONERY_ monery  
+		FROM MONERY_DETAILS md 
+		JOIN HOUSE_MONERY hm ON hm.ID_ = md.MASTER_ID_ 
+		LEFT JOIN (SELECT cd.RECOMMEND_, ec.BROKER_ID_  
+			FROM CASH_DETAILS cd 
+			JOIN EXTRACT_CASH ec ON cd.EXTRACT_CASH_ID_ = ec.ID_ 
+			WHERE ec.TYPE_ IN ('0','3','4')
+		) a ON a.RECOMMEND_ = md.RECOMMEND_ AND a.BROKER_ID_ = hm.BROKER_ID_
+		WHERE md.TYPE_ = '2' AND a.RECOMMEND_ IS NULL AND md.ID_ IN  
+		<foreach collection="list" item="item" index="index" open="(" separator="," close=")">  
+            #{item}  
+        </foreach>
+	</select>
+	
+	<!-- 添加提现记录 -->
+	<insert id="insertExtract" parameterType="com.caac.house.broker.vo.ExtractVo">
+		INSERT INTO EXTRACT_CASH(ID_, BROKER_ID_, APPLY_TIME_, APPLY_MONERY_, APPLY_BROKER_, APPLY_BARGAIN_, TYPE_)
+		VALUES (#{id}, #{brokerId}, NOW(), #{applyMonery}, #{applyBroker}, #{applyBargain}, '0') 
+	</insert>
+	
+	<!-- 添加提现房源记录 -->
+	<insert id="insertCashDetails" parameterType="com.caac.house.broker.vo.CashDetailsVo">
+		INSERT INTO CASH_DETAILS(ID_, EXTRACT_CASH_ID_, MONERY_DETAILS_ID_, RECOMMEND_, MONERY_)
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{extractCashId}, #{moneryDetailsId}, #{recommend}, #{monery}) 
+	</insert>
+	
+	<!-- 添加申请总金额，并扣除申请金额 -->
+	<update id="updateApply" parameterType="com.caac.house.broker.vo.UpdateApplyVo">
+		UPDATE HOUSE_MONERY SET MONERY_ = MONERY_ - #{apply}, MONERY_BARGAIN_ = MONERY_BARGAIN_ - #{applyBargain}, 
+		    MONERY_BROKER_ = MONERY_BROKER_ - #{applyBroker}, APPLY_ = APPLY_ + #{apply}, 
+		    APPLY_BROKER_ = APPLY_BROKER_ + #{applyBroker}, APPLY_BARGAIN_ = APPLY_BARGAIN_ + #{applyBargain} 
+		WHERE BROKER_ID_ = #{brokerId} 
+	</update>
+	
+	<!-- 获取提现需要发送短信的相关人员 -->
+	<select id="getCashPhone" resultType="java.lang.String">
+	    SELECT sid.VALUE_ phones  
+	    FROM SYS_ITEM si 
+	    JOIN SYS_ITEM_DETAIL sid ON si.ID_ = sid.ITEM_ID_ 
+	    WHERE si.CODE_ = 'CASH_PHONE' AND si.STATUS_ = 0 
+	</select>	
+	
+	<!-- 获取申请提现记录 -->
+	<select id="getExtractRecord" parameterType="com.caac.house.broker.vo.ExtractPageVo" resultType="com.caac.house.broker.vo.ExtractRecordVo">
+	    SELECT ID_ id, APPLY_TIME_ applyTime, TYPE_ type, NOTE_ note, APPLY_MONERY_ applyMonery, APPLY_BROKER_ applyBroker, 
+	        APPLY_BARGAIN_ applyBargain   
+		FROM EXTRACT_CASH  
+		WHERE BROKER_ID_ = #{brokerId}   
+		ORDER BY APPLY_TIME_ DESC
+	</select>
+	
+	<!-- 获取申请提现的房源 -->
+	<select id="getBargainToExtractRecord" resultType="com.caac.house.broker.vo.BargainToExtractRecordVo">
+		SELECT p.NAME_ project, mb.MONERY_ monery, mb.NO_ no, mb.BUILDING_ building, cd.MONERY_ bargain, bu.NAME_ broker, 
+			pr.NAME_ customer, CASE pr.BROKER_ID_ WHEN #{0} THEN 0 ELSE 1 END type 
+		FROM CASH_DETAILS cd 
+		JOIN PROJECT_RECOMMEND pr ON pr.ID_ = cd.RECOMMEND_   
+		JOIN PROJECT p ON p.ID_ = pr.PROJECT_ID_ 
+		JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_ AND mb.STATUS_ = '1' 
+		JOIN BROKER_USER bu ON bu.ID_ = pr.BROKER_ID_  
+		WHERE cd.EXTRACT_CASH_ID_ = #{1} 
+	</select>
+	
+	<!-- 获取提现记录状态 -->
+	<select id="getExtractById" resultType="com.caac.house.broker.vo.ExtractByIdVo">
+	    SELECT APPLY_MONERY_ applyMonery, APPLY_BROKER_ applyBroker, APPLY_BARGAIN_ applyBargain, TYPE_ type   
+	    FROM EXTRACT_CASH 
+	    WHERE ID_ = #{0}  
+	</select>
+	
+	<!-- 取消提现 -->
+	<update id="cancelExtract">
+	    UPDATE EXTRACT_CASH 
+	    SET TYPE_ = '1' 
+	    WHERE ID_ = #{0}
+	</update>
+	
+	<!-- 取消提现后恢复房币表的金额 -->
+	<update id="resetMonery" parameterType="com.caac.house.broker.vo.UpdateApplyVo">
+	    UPDATE HOUSE_MONERY SET MONERY_ = MONERY_ + #{apply}, MONERY_BARGAIN_ = MONERY_BARGAIN_ + #{applyBargain}, 
+			MONERY_BROKER_ = MONERY_BROKER_ + #{applyBroker}, APPLY_ = APPLY_ - #{apply}, 
+			APPLY_BROKER_ = APPLY_BROKER_ - #{applyBroker}, APPLY_BARGAIN_ = APPLY_BARGAIN_ - #{applyBargain}  
+		WHERE BROKER_ID_ = #{brokerId} 
+	</update>
+	
+	<!-- 获取银行账号 -->
+	<select id="getAccountByBroker" resultType="com.caac.house.broker.vo.BankVo">
+	    SELECT ba.BANK_,ba.ACCOUNT_,ba.IDCARD_ FROM broker_auxiliary ba WHERE ba.BROKER_ID_ = #{0}
+	</select>
+	
+	<!-- 房亲收入列表 -->
+	<select id="getBrokerIncome" parameterType="com.caac.house.broker.vo.BrokerDetailPageVo" 
+		resultType="com.caac.house.broker.vo.MoneryDetailVo">
+		SELECT CASE md.TYPE_ 
+		       WHEN '1' THEN tj.NAME_ 
+		       WHEN '2' THEN jf.NAME_ 
+		       WHEN '4' THEN IFNULL(wxtj.NAME_,broker.NAME_)  
+		       WHEN '5' THEN zjtj.NAME_ 
+		       ELSE broker.NAME_ END NAME,
+       		   CASE md.TYPE_ 
+       		   WHEN '1' THEN tj.PHONE_ 
+       		   WHEN '2' THEN jf.PHONE_ 
+       		   WHEN '5' THEN zjtj.PHONE_ 
+       		   WHEN '4' THEN (CASE WHEN wxtj.NAME_ IS NULL THEN broker.PHONE_ ELSE wxtj.PHONE_ END)  
+       		   ELSE broker.PHONE_ END phone,
+               CASE md.TYPE_ 
+               WHEN '1' THEN tj.LOGO_ 
+               WHEN '2' THEN jf.LOGO_ 
+               WHEN '5' THEN zjtj.LOGO_ 
+               WHEN '4' THEN (CASE WHEN wxtj.NAME_ IS NULL THEN broker.LOGO_ ELSE wxtj.LOGO_ END) 
+               ELSE broker.LOGO_ END logo,
+               md.GET_TIME_ getTime, md.MONERY_ monery, md.TYPE_ TYPE
+        FROM MONERY_DETAILS md 
+		JOIN HOUSE_MONERY hm ON md.MASTER_ID_ = hm.ID_ 
+		JOIN BROKER_USER broker ON hm.BROKER_ID_ = broker.ID_ 
+		LEFT JOIN PROJECT_RECOMMEND pr ON pr.ID_ = md.RECOMMEND_ 
+		LEFT JOIN BROKER_USER jf ON jf.ID_ = pr.BROKER_ID_ AND md.TYPE_ = '2'
+		LEFT JOIN BROKER_USER tj ON  tj.RECOMMEND_ = md.RECOMMEND_ AND md.TYPE_ = '1' 
+		LEFT JOIN BROKER_USER wxtj ON wxtj.ID_ = md.RECOMMEND_ AND md.TYPE_ = '4' AND wxtj.SOURCE_ = '2'  
+		LEFT JOIN BROKER_USER zjtj ON zjtj.ID_ = md.RECOMMEND_ AND md.TYPE_ = '5' AND zjtj.SOURCE_ = '3'  
+		WHERE hm.BROKER_ID_ = #{broker} AND ((md.TYPE_ = '2' AND pr.BROKER_ID_ != hm.BROKER_ID_) OR md.TYPE_ != '2')
+		ORDER BY md.GET_TIME_ DESC
+	</select>
+	
+	<!-- 客户收入列表 -->
+	<select id="getClientIncome" parameterType="com.caac.house.broker.vo.ClientDetailPageVo" 
+		resultType="com.caac.house.broker.vo.MoneryDetailVo">
+		SELECT pr.NAME_ name, pr.PHONE_ phone, md.GET_TIME_ getTime, md.MONERY_ monery, md.TYPE_ type   
+		FROM MONERY_DETAILS md 
+		JOIN HOUSE_MONERY hm ON md.MASTER_ID_ = hm.ID_
+		JOIN PROJECT_RECOMMEND pr ON pr.ID_ = md.RECOMMEND_ AND pr.BROKER_ID_ = hm.BROKER_ID_ 
+		WHERE hm.BROKER_ID_ = #{broker} 
+	</select>
+	
+	<!-- 我的收入 -->
+	<select id="getMyRevenue" parameterType="com.caac.house.broker.vo.MyRevenuePageVo" resultType="com.caac.house.broker.vo.MoneryDetailVo">
+	    SELECT name, phone, logo, getTime, monery, type, bargainType, wxtjType    
+        FROM (SELECT CASE md.TYPE_ 
+                                  WHEN '1' THEN tj.NAME_ 
+                                  WHEN '2' THEN (CASE WHEN pr.BROKER_ID_ = broker.ID_ THEN pr.NAME_ ELSE jf.NAME_ END) 
+                                  WHEN '4' THEN IFNULL(wxtj.NAME_,broker.NAME_) 
+                                  WHEN '5' THEN zjtj.NAME_ 
+                                  ELSE broker.NAME_ END name, 
+	                          CASE md.TYPE_ 
+	                              WHEN '1' THEN tj.PHONE_ 
+	                              WHEN '2' THEN (CASE WHEN pr.BROKER_ID_ = broker.ID_ THEN pr.PHONE_ ELSE jf.PHONE_ END)  
+	                              WHEN '5' THEN zjtj.PHONE_ 
+	                              WHEN '4' THEN (CASE WHEN wxtj.NAME_ IS NULL THEN broker.PHONE_ ELSE wxtj.PHONE_ END) 
+		                          ELSE broker.PHONE_ END phone, 
+	                          CASE md.TYPE_ 
+	                              WHEN '1' THEN tj.LOGO_ 
+	                              WHEN '2' THEN (CASE WHEN pr.BROKER_ID_ = broker.ID_ THEN NULL ELSE jf.LOGO_ END) 
+	                              WHEN '5' THEN zjtj.LOGO_ 
+	                              WHEN '4' THEN (CASE WHEN wxtj.NAME_ IS NULL THEN broker.LOGO_ ELSE wxtj.LOGO_ END) 
+		                          ELSE broker.LOGO_ END logo, 
+	                          md.GET_TIME_ getTime, md.MONERY_ monery, md.TYPE_ type,   
+	                          CASE WHEN pr.BROKER_ID_ = broker.ID_ THEN 0 ELSE 1 END bargainType,
+	                          CASE md.TYPE_ WHEN '4' THEN (CASE WHEN wxtj.ID_ = broker.ID_ THEN 1 ELSE 2 END) ELSE 0 END wxtjType     
+	              FROM MONERY_DETAILS md 
+	              JOIN HOUSE_MONERY hm ON md.MASTER_ID_ = hm.ID_ 
+	              JOIN BROKER_USER broker ON hm.BROKER_ID_ = broker.ID_ 
+	              LEFT JOIN PROJECT_RECOMMEND pr ON pr.ID_ = md.RECOMMEND_ 
+	              LEFT JOIN BROKER_USER jf ON jf.ID_ = pr.BROKER_ID_ AND md.TYPE_ = '2' 
+	              LEFT JOIN BROKER_USER tj ON tj.RECOMMEND_ = md.RECOMMEND_ AND md.TYPE_ = '1' 
+	              LEFT JOIN BROKER_USER wxtj ON wxtj.ID_ = md.RECOMMEND_ AND md.TYPE_ = '4' AND wxtj.SOURCE_ = '2' 
+	              LEFT JOIN BROKER_USER zjtj ON zjtj.ID_ = md.RECOMMEND_ AND md.TYPE_ = '5' AND zjtj.SOURCE_ = '3' 
+	              WHERE hm.BROKER_ID_ = #{broker}
+        ) a
+        <where>
+		    <!-- 房亲收入 -->
+			<if test="searchType == 0">
+			    AND a.TYPE != '2'
+			</if>
+			<!-- 客户收入 -->
+			<if test="searchType == 1">
+			    AND a.TYPE = '2' 
+			</if>
+			<if test="searchText != null">
+		        AND (a.NAME LIKE CONCAT('%', #{searchText} ,'%') OR a.PHONE LIKE CONCAT('%', #{searchText}, '%'))
+		</if>
+		</where>        
+        ORDER BY a.getTime DESC		
+	</select>
+	
+	<!-- 收入列表汇总 -->
+	<select id="getIncomeTotal" resultType="com.caac.house.broker.vo.IncomeTotalVo">
+		SELECT (SELECT COUNT(0) 
+		            FROM MAKE_BARGAIN mb 
+		            JOIN PROJECT_RECOMMEND pr ON mb.RECOMMEND_ = pr.ID_ 
+                    WHERE pr.BROKER_ID_ = #{0} OR pr.BROKER_ID_ IN (
+                        SELECT ID_
+                        FROM BROKER_USER bu
+                        WHERE bu.PID_ = #{0} 
+                        UNION
+                        SELECT bu.ID_ 
+                        FROM BROKER_USER bu
+                        JOIN BROKER_USER buc ON buc.ID_ = bu.PID_
+                        WHERE buc.PID_ = #{0} 
+                    )) bargain,
+           (SELECT MONERY_ FROM HOUSE_MONERY WHERE BROKER_ID_ = #{0}) monery,
+           (SELECT CASH_ FROM HOUSE_MONERY WHERE BROKER_ID_ = #{0}) cash, 
+           (SELECT COUNT(0) FROM BROKER_USER WHERE PID_ = #{0}) broker, 
+           (SELECT COUNT(0) FROM PROJECT_RECOMMEND WHERE BROKER_ID_ = #{0}) client 
+	</select>
+	
+</mapper>

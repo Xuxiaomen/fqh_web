@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.broker.dao.SpreadDao">
+	<!-- 获取滚动信息 -->
+    <select id="getScrollInfo" resultType="com.caac.house.broker.vo.ScrollInfoVo">
+        SELECT ad.TEXT_ content FROM FQH_ADVERTISING_TEXT ad ORDER BY ad.IDX_ DESC,ad.CREATE_TIME_ DESC 
+    </select>
+    
+    <!-- 获取推广图片 -->
+    <select id="getPictureInfo" resultType="com.caac.house.broker.vo.SpreadVo">
+        SELECT a.PIC_ pic,CASE a.URL_TYPE_ WHEN 0 THEN CONCAT(bf.ADDRESS_,'/',bf.NAME_) WHEN 1 THEN a.URL_ END url
+		FROM BANNER a 
+		LEFT JOIN BANNER_FILE bf ON bf.BANNER_ID_ = a.ID_ AND bf.INDEX_ = 1
+		WHERE a.STATUS_ = 0 AND a.SYSTEM_ = 1 
+		ORDER BY a.IDX_ DESC,a.CREATE_TIME_ DESC 
+    </select>
+    
+    <!-- 获取滚动信息列表 -->
+    <select id="getScrollList" parameterType="com.caac.house.broker.vo.ScrollParamVo" 
+    	resultType="com.caac.house.broker.vo.ScrollListVo">
+        SELECT ad.TIME_ time, ad.TYPE_ type, p.NAME_ name, ad.TEXT_ content, 
+        	CASE WHEN pe.LOGO_ IS NULL THEN pe.FIGURE_ ELSE pe.LOGO_ END logo 
+        FROM FQH_ADVERTISING_TEXT ad 
+        LEFT JOIN PROJECT p ON p.ID_ = ad.PROJECT_ID_ 
+        LEFT JOIN PROJECT_EXTEND pe ON pe.PROJECT_ID_ = p.ID_ 
+        ORDER BY ad.TIME_ DESC, ad.IDX_ DESC
+    </select>
+</mapper>

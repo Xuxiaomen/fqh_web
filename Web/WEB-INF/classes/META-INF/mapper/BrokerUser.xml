@@ -1,0 +1,410 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.system.dao.BrokerUserDao">
+	
+	<!-- 根据手机号码和密码读取经纪人信息 -->
+	<select id="getBroker" parameterType="com.caac.house.system.vo.LoginVo" resultType="com.kernle.engine.entity.User">
+		SELECT bu.ID_ id, bu.PID_ pid, bu.NAME_ name, bu.NICKNAME_ nickname, bu.VISIBLE_ visible, 
+			bu.PHONE_ phone, bu.SOURCE_ source, bu.RECOMMEND_ recommend, bu.RECOMMEND_TIME_ recommendTime,
+			bu.REGISTER_TIME_ registerTime, bu.LOGIN_TIME_ loginTime, bu.AUTO_LOGIN_ autoLogin, ba.BANK_ bank, 
+			ba.ACCOUNT_NAME_ accountName, ba.ACCOUNT_ account, ba.MOTTO_ motto    
+        FROM BROKER_USER bu
+        LEFT JOIN BROKER_AUXILIARY ba ON bu.ID_ = ba.BROKER_ID_
+        WHERE bu.STATUS_ = '0' AND bu.PHONE_ = #{phone} AND bu.PWD_ = #{pwd}
+	</select>
+	
+	<!-- 根据手机号码和密码读取被推荐人信息 -->
+	<select id="getRecommend" parameterType="com.caac.house.system.vo.LoginVo" resultType="java.lang.String">
+		SELECT ID_ 
+		FROM BROKER_RECOMMEND 
+		WHERE PHONE_ = #{phone} AND PWD_ = #{pwd} AND STATUS_ = '0'
+	</select>
+	
+	<!-- 更新经纪人登录时间 -->
+	<update id="updateLoginTime" parameterType="java.lang.String">
+		UPDATE BROKER_USER SET LOGIN_TIME_ = NOW() WHERE ID_ = #{id}
+	</update>
+	
+	<!-- 判断手机号码是否已经存在 -->
+	<select id="getExistPhone" resultType="java.lang.Integer">
+		<![CDATA[
+			SELECT COUNT(0) FROM BROKER_USER WHERE PHONE_ = #{0} AND STATUS_ = '0'
+		]]>
+	</select>
+	
+	<!-- 经纪人注册 -->
+	<insert id="register" parameterType="com.caac.house.system.entity.BrokerUser">
+		<![CDATA[
+			INSERT INTO BROKER_USER (ID_,PID_,NAME_,NICKNAME_,VISIBLE_,PHONE_,PWD_,SOURCE_,
+				STATUS_,RECOMMEND_,RECOMMEND_TIME_,REGISTER_TIME_,LOGIN_TIME_) 
+			VALUES(#{id},#{pid},#{name},#{nickname},#{visible},#{phone},#{pwd},#{source},
+				'0',#{recommend},#{recommendTime},NOW(),#{loginTime})
+		]]>
+	</insert>
+	
+	<!-- 密码找回 -->
+	<update id="updatePassword">
+		UPDATE BROKER_USER SET PWD_ = #{1} WHERE PHONE_ = #{0}
+	</update>
+	
+	<delete id="deleteOpenId" parameterType="java.lang.String">
+		DELETE FROM BROKER_OPEN_ID WHERE OPEN_ID_ = #{id}
+	</delete>
+	
+	<insert id="saveOpenId" parameterType="com.caac.house.system.vo.OpenIdVo">
+		INSERT INTO BROKER_OPEN_ID(BROKER_ID_, OPEN_ID_) VALUES (#{brokerId}, #{openId})
+	</insert>
+	
+	<select id="getUserByOpenId" parameterType="java.lang.String" resultType="com.kernle.engine.entity.User">
+		SELECT bu.ID_ id, bu.PID_ pid, bu.NAME_ NAME, bu.NICKNAME_ nickname, bu.VISIBLE_ visible, 
+			bu.PHONE_ phone, bu.SOURCE_ source, bu.RECOMMEND_ recommend, bu.RECOMMEND_TIME_ recommendTime, 
+			bu.REGISTER_TIME_ registerTime, bu.LOGIN_TIME_ loginTime, bu.AUTO_LOGIN_ autoLogin, ba.BANK_ bank, 
+			ba.ACCOUNT_NAME_ accountName, ba.ACCOUNT_ account, ba.MOTTO_ motto    
+		FROM BROKER_USER bu
+		JOIN BROKER_OPEN_ID boi ON boi.BROKER_ID_ = bu.ID_
+		LEFT JOIN BROKER_AUXILIARY ba ON bu.ID_ = ba.BROKER_ID_
+		WHERE bu.STATUS_ = '0' AND boi.OPEN_ID_ = #{id}
+	</select>
+	
+	<!-- 获取个人资料 -->
+	<select id="getUserInfo" parameterType="java.lang.String" resultType="com.caac.house.system.vo.UserVo">
+		select bu.NAME_ name,bu.SEX_ sex,bu.LOGO_ logo,ba.IDCARD_ idcard,ba.ADDRESS_ address,ba.JOB_ job,ba.BANK_ bank,
+		ba.ACCOUNT_NAME_ accountName,INSERT(ba.ACCOUNT_,4,4,'****') account,ba.NATIVE_ natives,ba.PHONE_ phone,ba.QQ_ qq,
+		ba.WX_ wx,ba.MAIL_ mail,bu.VISIBLE_ visiable,bu.NICKNAME_ nickname,ba.MOTTO_ motto
+		from BROKER_USER bu
+		left join BROKER_AUXILIARY ba on ba.BROKER_ID_ = bu.ID_
+		where bu.ID_ = #{0}
+	</select>
+	
+	<!-- 获取首页的个人资料 -->
+	<select id="getUserToIndex" resultType="com.caac.house.system.vo.IndexInfoVo">
+		SELECT bu.NAME_ name, bu.LOGO_ logo, bu.VISIBLE_ visiable, bu.NICKNAME_ nickname, ba.MOTTO_ motto
+		FROM BROKER_USER bu
+		LEFT JOIN BROKER_AUXILIARY ba ON ba.BROKER_ID_ = bu.ID_
+		WHERE bu.ID_ = #{0} 
+	</select>
+	
+	<!-- 修改个人资料 -->
+	<update id="updateUserInfo" parameterType="com.caac.house.system.vo.UserVo">
+		update BROKER_USER set SEX_ = #{sex},NICKNAME_ = #{nickname},VISIBLE_ = #{visiable} where ID_ = #{id}
+	</update>
+	
+	<!-- 修改个人其他信息资料 -->
+	<update id="updateUserOtherInfo" parameterType="com.caac.house.system.vo.UserVo">
+		update BROKER_AUXILIARY set IDCARD_=#{idcard}, ADDRESS_=#{address}, JOB_=#{job}, 
+			NATIVE_=#{natives}, PHONE_=#{phone}, QQ_=#{qq}, WX_=#{wx}, MAIL_=#{mail},MOTTO_=#{motto}
+		where BROKER_ID_ = #{brokerId}
+	</update>
+	
+	<!-- 获取旧密码 -->
+	<select id="getOldPasswordById" resultType="java.lang.String">
+		SELECT PWD_ FROM BROKER_USER WHERE ID_ = #{0}
+	</select>
+	
+	<!-- 修改密码 -->
+	<update id="updatePasswordByOldPwd" parameterType="com.caac.house.system.vo.UserVo">
+		UPDATE BROKER_USER SET PWD_ = #{newPwd} WHERE ID_ = #{id}
+	</update>
+	
+	<!-- 根据经纪人查出附属信息 -->
+	<select id="getOtherInfo" parameterType="java.lang.String" resultType="java.lang.Integer">
+	    SELECT COUNT(0) FROM BROKER_AUXILIARY WHERE BROKER_ID_ = #{0}
+	</select>
+	
+	<!-- 新增经纪人附属信息 -->
+	<insert id="insertOtherInfo" parameterType="com.caac.house.system.vo.UserVo">
+		INSERT INTO BROKER_AUXILIARY (ID_, BROKER_ID_, IDCARD_, ADDRESS_, JOB_, NATIVE_, PHONE_, QQ_, WX_, MAIL_,MOTTO_) 
+		VALUES (#{id}, #{brokerId}, #{idcard}, #{address}, #{job}, #{natives}, #{phone}, #{qq}, #{wx},#{mail},#{motto})
+	</insert>
+	
+	<!-- 根据经纪人id查出关联的银行账号 -->
+	<select id="getBankByUserId" parameterType="java.lang.String" resultType="java.lang.String">
+	    SELECT ACCOUNT_ FROM BROKER_AUXILIARY WHERE BROKER_ID_ = #{0}
+	</select>
+	
+	<!-- 新增银行账号信息 -->
+	<insert id="addBankInfo" parameterType="com.caac.house.system.vo.UserVo">
+		INSERT INTO BROKER_AUXILIARY (ID_,BROKER_ID_,BANK_,ACCOUNT_NAME_,ACCOUNT_,IDCARD_) 
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler},#{brokerId},#{bank},#{accountName},#{account},#{idcard})
+	</insert>
+	
+	<!-- 修改银行账号信息 -->
+	<update id="updateBankInfo" parameterType="com.caac.house.system.vo.UserVo">
+		UPDATE BROKER_AUXILIARY SET BANK_ = #{bank},ACCOUNT_NAME_ = #{accountName},
+		ACCOUNT_ = #{account},IDCARD_ = #{idcard} WHERE BROKER_ID_ = #{brokerId}
+	</update>
+	
+	<!-- 经纪人可用房币 -->
+	<select id="getBrokerMonery" resultType="java.lang.Double">
+		SELECT MONERY_ FROM HOUSE_MONERY WHERE BROKER_ID_ = #{0} 
+	</select>
+	
+	<!-- 经纪人直接房亲总数  -->
+	<select id="getBrokerChildCount" resultType="java.lang.Integer">
+		SELECT COUNT(0) total FROM BROKER_USER WHERE PID_ = #{0} 
+	</select>
+	
+	<!-- 经纪人直接房亲总数和房亲的佣金 -->
+	<select id="getBrokerChildInfo" resultType="com.caac.house.system.vo.TotalInfoVo">
+		SELECT COUNT(0) total, IFNULL(SUM(hm.TOTAL_BARGAIN_),0) totalBargain 
+		FROM BROKER_USER bu 
+		JOIN HOUSE_MONERY hm ON bu.ID_ = hm.BROKER_ID_ 
+		WHERE bu.PID_ = #{0} 
+	</select>
+	
+	<!-- 经纪人直接房亲前5位 -->
+	<select id="getBrokerChildOfFive" resultType="com.caac.house.system.vo.BrokerChildVo">
+		SELECT bu.ID_ id, bu.NAME_ name, bu.PHONE_ phone, (SELECT COUNT(0) FROM BROKER_USER c WHERE c.PID_ = bu.ID_) num, 
+			hm.TOTAL_BARGAIN_ totalBargain, bu.LOGO_ logo
+		FROM BROKER_USER bu
+		JOIN HOUSE_MONERY hm ON bu.ID_ = hm.BROKER_ID_  
+		WHERE PID_ = #{0}
+		ORDER BY REGISTER_TIME_ DESC 
+		LIMIT 0,5  
+	</select>
+	
+	<!-- 经纪人直接房亲 -->
+	<select id="getBrokerChild" parameterType="com.caac.house.system.vo.BrokerChildPageVo" 
+	    	resultType="com.caac.house.system.vo.BrokerChildVo">
+		SELECT bu.ID_ id, bu.NAME_ NAME, bu.PHONE_ phone, 
+			(SELECT COUNT(0) FROM BROKER_USER c WHERE c.PID_ = bu.ID_) num, 
+			ROUND(hm.TOTAL_BARGAIN_*0.2)+5 totalBargain, 
+			bu.LOGO_ logo, IFNULL(a.monery,0) monery     
+		FROM BROKER_USER bu
+		JOIN HOUSE_MONERY hm ON bu.ID_ = hm.BROKER_ID_
+		LEFT JOIN (SELECT pr.BROKER_ID_, SUM(mb.MONERY_) monery 
+				   FROM PROJECT_RECOMMEND pr 
+		           JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_
+		           WHERE pr.RECOMMEND_STATUS_ = '3'
+                   GROUP BY pr.BROKER_ID_) a ON a.BROKER_ID_ = bu.ID_  
+        WHERE bu.PID_ = #{brokerId}
+        ORDER BY REGISTER_TIME_ DESC
+	</select>
+	
+	<!-- 经纪人间接房亲总数 -->
+	<select id="getBrokerGrandsonCount" resultType="java.lang.Integer">
+		SELECT COUNT(0) total  
+		FROM BROKER_USER bu, BROKER_USER child  
+		WHERE child.PID_ = bu.ID_ AND bu.PID_ = #{0} 
+	</select>
+	
+	<!-- 经纪人间接房亲总数和房亲的佣金 -->
+	<select id="getBrokerGrandsonInfo" resultType="com.caac.house.system.vo.TotalInfoVo">
+		SELECT COUNT(0) total, IFNULL(SUM(hm.TOTAL_BARGAIN_),0) totalBargain   
+		FROM BROKER_USER bu
+		JOIN BROKER_USER child ON child.PID_ = bu.ID_
+		JOIN HOUSE_MONERY hm ON child.ID_ = hm.BROKER_ID_  
+		WHERE bu.PID_ = #{0} 
+	</select>
+	
+	<!-- 经纪人间接房亲前5位 -->
+	<select id="getBrokerGrandsonOfFive" resultType="com.caac.house.system.vo.BrokerGrandsonVo">
+		SELECT child.ID_ id, child.NAME_ name, child.PHONE_ phone, hm.TOTAL_BARGAIN_ totalBargain 
+		FROM BROKER_USER bu
+		JOIN BROKER_USER child ON child.PID_ = bu.ID_ 
+		JOIN HOUSE_MONERY hm ON child.ID_ = hm.BROKER_ID_   
+		WHERE bu.PID_ = #{0} 
+		LIMIT 0,5
+	</select>
+	
+	<!-- 经纪人间接房亲 -->
+	<select id="getBrokerGrandson" parameterType="com.caac.house.system.vo.BrokerGrandsonPageVo" 
+	    	resultType="com.caac.house.system.vo.BrokerGrandsonVo">
+		SELECT child.ID_ id, child.NAME_ NAME, child.PHONE_ phone, 
+		    ROUND(hm.TOTAL_BARGAIN_*0.1) totalBargain, 
+			child.LOGO_ logo, IFNULL(a.monery,0) monery  
+		FROM BROKER_USER bu
+		JOIN BROKER_USER child ON child.PID_ = bu.ID_ 
+		JOIN HOUSE_MONERY hm ON child.ID_ = hm.BROKER_ID_
+		LEFT JOIN (SELECT pr.BROKER_ID_, SUM(mb.MONERY_) monery 
+				   FROM PROJECT_RECOMMEND pr 
+                   JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_
+                   WHERE pr.RECOMMEND_STATUS_ = '3'
+                   GROUP BY pr.BROKER_ID_) a ON a.BROKER_ID_ = child.ID_   
+        WHERE bu.PID_ = #{brokerId}
+	</select>
+	
+	<!-- 经纪人财务报表 - 直接房亲活跃度不统计月份总数 -->
+	<select id="getChildNoCount" resultType="java.lang.Integer">
+	<![CDATA[
+		SELECT COUNT(0) counts    
+		FROM BROKER_USER bu 
+		WHERE PID_ = #{0} AND bu.REGISTER_TIME_ < DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00')
+	]]>
+	</select>
+	
+	<!-- 经纪人财务报表-直接房亲活跃度 -->
+	<select id="getChildOfMonth" resultType="com.caac.house.system.vo.MonthVo">
+	<![CDATA[
+		SELECT DATE_FORMAT(bu.REGISTER_TIME_,'%Y%m') months, COUNT(0) counts    
+		FROM BROKER_USER bu 
+		WHERE PID_ = #{0} AND bu.REGISTER_TIME_ >= DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00')
+		GROUP BY months
+	]]>
+	</select>
+	
+	<!-- 经纪人财务报表 - 直接房亲不统计月的总成交量 -->
+	<select id="getChildBargainNoCount" resultType="java.lang.Integer">
+	<![CDATA[
+		SELECT COUNT(0) counts        
+		FROM BROKER_USER bu
+		JOIN PROJECT_RECOMMEND pr ON bu.ID_ = pr.BROKER_ID_ AND pr.RECOMMEND_STATUS_ = '3'
+		JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_ 
+		WHERE PID_ = #{0} AND mb.TIME_ < DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00')
+	]]>
+	</select>
+	
+	<!-- 经纪人财务报表-直接房亲成交量 -->
+	<select id="getChildBargainOfMonth" resultType="com.caac.house.system.vo.MonthVo">
+	<![CDATA[
+		SELECT DATE_FORMAT(mb.TIME_,'%Y%m') months, COUNT(0) counts        
+		FROM BROKER_USER bu
+		JOIN PROJECT_RECOMMEND pr ON bu.ID_ = pr.BROKER_ID_ AND pr.RECOMMEND_STATUS_ = '3'
+		JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_ 
+		WHERE PID_ = #{0} AND mb.TIME_ >= DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00')
+		GROUP BY months
+	]]>
+	</select>
+	
+	<!-- 经纪人财务报表 - 间接房亲不统计月的总活跃度 -->
+	<select id="getGrandsonNoCount" resultType="java.lang.Integer">
+	<![CDATA[
+		SELECT COUNT(0) counts  
+		FROM BROKER_USER bu 
+		JOIN BROKER_USER child ON child.PID_ = bu.ID_    
+		WHERE bu.PID_ = #{0} AND child.REGISTER_TIME_ < DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00')  
+	]]>
+	</select>
+	
+	<!-- 经纪人财务报表-间接房亲活跃度 -->
+	<select id="getGrandsonOfMonth" resultType="com.caac.house.system.vo.MonthVo">
+	<![CDATA[
+		SELECT DATE_FORMAT(child.REGISTER_TIME_,'%Y%m') months, COUNT(0) counts  
+		FROM BROKER_USER bu 
+		JOIN BROKER_USER child ON child.PID_ = bu.ID_    
+		WHERE bu.PID_ = #{0} AND child.REGISTER_TIME_ >= DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00') 
+		GROUP BY months 
+	]]>
+	</select>
+	
+	<!-- 经纪人财务报表-间接房亲不统计月的总成交量 -->
+	<select id="getGrandsonBargainNoCount" resultType="java.lang.Integer">
+	<![CDATA[
+		SELECT COUNT(0) counts   
+		FROM BROKER_USER bu 
+		JOIN BROKER_USER child ON child.PID_ = bu.ID_
+		JOIN PROJECT_RECOMMEND pr ON child.ID_ = pr.BROKER_ID_ AND pr.RECOMMEND_STATUS_ = '3'
+		JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_    
+		WHERE bu.PID_ = #{0} AND mb.TIME_ >= DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00')
+	]]>
+	</select>
+	
+	<!-- 经纪人财务报表-间接房亲成交量 -->
+	<select id="getGrandsonBargainOfMonth" resultType="com.caac.house.system.vo.MonthVo">
+	<![CDATA[
+		SELECT DATE_FORMAT(mb.TIME_,'%Y%m') months, COUNT(0) counts   
+		FROM BROKER_USER bu 
+		JOIN BROKER_USER child ON child.PID_ = bu.ID_
+		JOIN PROJECT_RECOMMEND pr ON child.ID_ = pr.BROKER_ID_ AND pr.RECOMMEND_STATUS_ = '3'
+		JOIN MAKE_BARGAIN mb ON mb.RECOMMEND_ = pr.ID_    
+		WHERE bu.PID_ = #{0} AND mb.TIME_ >= DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH),'%Y-%m-01 00:00:00')
+		GROUP BY months
+	]]>
+	</select>	
+	
+	<!-- 获取经纪人的二维码Ticket -->
+	<select id="getTicket" resultType="java.lang.String">
+		SELECT TICKET_ FROM BROKER_USER WHERE ID_ = #{0} 
+	</select>
+	
+	<!-- 存放经纪人的二维码Ticket -->
+	<update id="updateTicket">
+		UPDATE BROKER_USER SET TICKET_ = #{0} WHERE ID_ = #{1}
+	</update>
+	
+	<!-- 获取经纪人名称 -->
+	<select id="getBrokerName" resultType="java.lang.String">
+		SELECT NAME_ FROM BROKER_USER WHERE ID_ = #{0} 
+	</select>
+	
+	<!-- 判断用户是否登录 -->
+	<select id="getOpenId" resultType="java.lang.String">
+		SELECT BROKER_ID_ FROM BROKER_OPEN_ID WHERE OPEN_ID_ = #{0} 
+	</select>
+	
+	<!-- 修改经纪人头像 -->
+	<update id="updateUserLogo">
+	    UPDATE BROKER_USER SET LOGO_ = #{1} WHERE ID_ = #{0}
+	</update>
+	
+	<!-- 获取用户头像 -->
+	<select id="getUserImg" resultType="java.lang.String">
+		SELECT LOGO_ FROM BROKER_USER WHERE ID_ = #{0} 
+	</select>
+	
+	<!-- 获取经纪人推荐页信息 -->
+	<select id="getUserbyRecommend" resultType="com.caac.house.system.vo.UserRecommendVo">
+	    SELECT bu.LOGO_ userLogo,bu.NAME_ userName,(SELECT COUNT(0) brokerNum FROM BROKER_USER b WHERE b.PID_ = #{0}) brokerNum,
+			IFNULL(SUM((child.childMonery*0.2)+(grandson.grandsonMonery*0.1)),0) monery,bu.VISIBLE_ visiable,bu.NICKNAME_ nickname
+		FROM BROKER_USER bu
+		LEFT JOIN (
+			SELECT child.ID_,child.PID_,IFNULL(SUM(hm.TOTAL_BARGAIN_),0) childMonery
+			FROM BROKER_USER child
+			JOIN HOUSE_MONERY hm ON hm.BROKER_ID_ = child.ID_ 
+			WHERE child.PID_ = #{0}) child ON child.PID_ = bu.ID_
+		LEFT JOIN (
+			SELECT grandson.PID_,IFNULL(SUM(hm.TOTAL_BARGAIN_),0) grandsonMonery
+			FROM BROKER_USER child
+			JOIN BROKER_USER grandson ON child.ID_ = grandson.PID_
+			JOIN HOUSE_MONERY hm ON hm.BROKER_ID_ = grandson.ID_ 
+			WHERE child.PID_ = #{0}) grandson ON grandson.PID_ = child.ID_
+		WHERE bu.ID_ = #{0}
+	</select>
+	
+	<!-- 查询经纪人之间的微信推荐关系 -->
+	<select id="getWxRecommend" resultType="java.lang.String">
+		SELECT BROKER_ FROM WX_RECOMMEND WHERE OPEN_ID_ = #{0} 
+	</select>
+	
+	<!-- 保存经纪人之间的微信推荐关系 -->
+	<insert id="insertWxRecommend" parameterType="com.caac.house.system.entity.WxRecommend">
+		INSERT INTO WX_RECOMMEND(BROKER_, OPEN_ID_)
+		VALUES (#{broker}, #{openId})
+	</insert>
+	
+	<!-- 删除经纪人之间的微信推荐关系 -->
+	<delete id="deleteWxRecommend">
+		DELETE FROM WX_RECOMMEND WHERE OPEN_ID_ = #{0} 
+	</delete>
+	
+	<!-- 根据手机号获取经纪人id -->
+	<select id="getUserIdByPhone" resultType="java.lang.String">
+	    SELECT ID_ FROM BROKER_USER WHERE PHONE_ = #{0} AND STATUS_ = '0'
+	</select>
+	
+	<!-- 添加经纪人日志 -->
+	<insert id="insertBrokerLog" parameterType="com.caac.house.system.entity.BrokerLog">
+		INSERT INTO BROKER_LOG(ID_, BROKER_ID_, OPEN_ID_, PHONE_, TYPE_, SUB_TYPE_, TIME_) 
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{brokerId}, #{openId}, #{phone}, #{type}, #{subType}, NOW())
+	</insert>
+	
+	<!-- 获取经纪人基本信息 -->
+	<select id="getUserBaseByOpenId" parameterType="java.lang.String" resultType="com.kernle.engine.entity.User">
+		SELECT bu.ID_ id, bu.PHONE_ phone     
+		FROM BROKER_USER bu
+		JOIN BROKER_OPEN_ID boi ON boi.BROKER_ID_ = bu.ID_
+		WHERE boi.OPEN_ID_ = #{id}
+	</select>
+	
+	<!-- 更新经纪人自动登录标示 -->
+	<update id="updateAutoLogin">
+		UPDATE BROKER_USER SET AUTO_LOGIN_ = #{0} WHERE ID_ = #{1} 
+	</update>
+	
+	<!-- 获取经纪人Logo -->
+	<select id="getLogo" resultType="java.lang.String">
+		SELECT LOGO_ FROM BROKER_USER WHERE ID_ = #{0} 
+	</select>
+	
+	
+</mapper>

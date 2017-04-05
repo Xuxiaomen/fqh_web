@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?><project-modules id="moduleCoreId" project-version="1.5.0">
+    <wb-module deploy-name="fqhWeixin">
+        <wb-resource deploy-path="/" source-path="/Web" tag="defaultRootSource"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/src"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/resource"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/weixin"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/engine"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/system"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/broker"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/project"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/message"/>
+        <property name="context-root" value="fqhWeixin"/>
+        <property name="java-output-path" value="/fqhWeixin/build/classes"/>
+    </wb-module>
+</project-modules>

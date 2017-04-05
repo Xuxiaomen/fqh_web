@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.project.dao.SalesDao">
+	<!-- 根据推荐id获取楼盘id -->
+    <select id="getProjIdByRecommend" resultType="com.caac.house.broker.entity.Recommend">
+        SELECT PROJECT_ID_ projId , TIME_ time,BROKER_ID_ brokerId FROM PROJECT_RECOMMEND WHERE ID_ = #{0}
+    </select>
+    
+    <!-- 获取销售人员的成绩信息 -->
+    <select id="getSalesPerformance" resultType="com.caac.house.project.entity.SalesPerformance">
+    	SELECT ID_ id, PROJECT_ID_ projectId, SALES_ sales, SCORE_ score, BROKER_SCORE_ brokerScore, 
+    		BROKER_COUNT_ brokerCount, BARGAIN_ bargain, MONERY_ monery, SEND_ send, 
+    		APPOINT_ appoint, ARRIVE_ arrive, VISIT_ visit    
+		FROM SALES_PERFORMANCE 
+		WHERE PROJECT_ID_ = #{0} AND SALES_ = #{1}
+    </select>
+    
+    <!-- 添加销售人员的成绩信息 -->
+    <insert id="insertSalesPerformanace" parameterType="com.caac.house.project.entity.SalesPerformance">
+    	INSERT INTO SALES_PERFORMANCE(ID_, PROJECT_ID_, SALES_, SCORE_, BROKER_SCORE_, 
+    		BROKER_COUNT_, BARGAIN_, MONERY_, SEND_, APPOINT_, ARRIVE_, VISIT_, SIGN_)
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{projectId}, #{sales}, 
+			#{score}, #{brokerScore}, #{brokerCount}, #{bargain}, #{monery}, #{send}, #{appoint}, 
+			#{arrive}, #{visit}, #{sign})
+    </insert>
+    
+    <!-- 更新销售人员的派单次数 -->
+    <update id="updateSalesPerformanaceSend" parameterType="com.caac.house.project.entity.SalesPerformance">
+    	UPDATE SALES_PERFORMANCE SET SEND_ = SEND_ + 1 WHERE ID_ = #{id}
+    </update>
+    
+     <!-- 更新销售人员的约访次数 -->
+    <update id="updateSalesPerformanaceAppoint" parameterType="com.caac.house.project.entity.SalesPerformance">
+    	UPDATE SALES_PERFORMANCE SET APPOINT_ = APPOINT_ + 1 WHERE ID_ = #{id}
+    </update>
+    
+    <!-- 更新销售人员的到访次数 -->
+    <update id="updateSalesPerformanaceArrive" parameterType="com.caac.house.project.entity.SalesPerformance">
+    	UPDATE SALES_PERFORMANCE SET ARRIVE_ = ARRIVE_ + 1 WHERE ID_ = #{id}
+    </update>
+    
+    <!-- 更新销售人员的回访次数 -->
+    <update id="updateSalesPerformanaceVisit" parameterType="com.caac.house.project.entity.SalesPerformance">
+    	UPDATE SALES_PERFORMANCE SET VISIT_ = VISIT_ + 1 WHERE ID_ = #{id}
+    </update>
+    
+    <!-- 更新销售人员的认购次数 -->
+    <update id="updateSalesPerformanaceSign" parameterType="com.caac.house.project.entity.SalesPerformance">
+    	UPDATE SALES_PERFORMANCE SET SIGN_ = SIGN_ + 1 WHERE ID_ = #{id}
+    </update>
+    
+    <!-- 获取指定楼盘下的置业顾问 -->
+    <select id="getUserByGroup" parameterType="com.caac.house.project.vo.UserPageVo" resultType="com.caac.house.project.vo.UserVo">
+        SELECT 
+        	su.ID_ userId,su.LOGO_ userLogo,su.NAME_ userName,sp.receive receive,sp.BARGAIN_ bargain,
+        	IFNULL(cu.num,0) champion,IFNULL(sp.score,0) score
+		FROM FCJ_USER su
+		JOIN PROJECT p ON su.DEPT_ = p.GROUP_
+		LEFT JOIN (
+			SELECT s.SALES_,SUM(s.APPOINT_+s.ARRIVE_+s.VISIT_) receive,s.BARGAIN_ ,SUM(s.SCORE_) score,s.PROJECT_ID_
+			FROM SALES_PERFORMANCE s 
+			WHERE s.PROJECT_ID_ = #{projId}
+			GROUP BY s.SALES_) sp ON su.ID_ = sp.SALES_
+		LEFT JOIN (
+			SELECT COUNT(0) num,c.USER_ID_
+			FROM (
+				SELECT a.USER_ID_ 
+				FROM CHAMPION_MONTH a, (
+					SELECT YEAR_, MONTH_, MAX(BARGAIN_) BARGAIN_ ,USER_ID_
+					FROM CHAMPION_MONTH 
+					WHERE PROJECT_ID_ = #{projId}
+					GROUP BY YEAR_, MONTH_) b 
+				WHERE a.PROJECT_ID_ = #{projId} AND a.YEAR_ = b.YEAR_ 
+				AND a.MONTH_ = b.MONTH_ AND a.BARGAIN_ = b.BARGAIN_
+				) c
+			GROUP BY c.USER_ID_) cu ON cu.USER_ID_ = sp.SALES_
+		WHERE p.ID_ = #{projId} AND su.SALES_TYPE_ = '2' AND su.STATUS_ = '0' AND p.STATUS_ = '0'
+		ORDER BY sp.BARGAIN_ DESC,score DESC,su.CREATE_DATE_ ASC 
+    </select>
+    
+    <!-- 获取置业顾问其他信息 -->
+    <select id="getUserOtherInfo" resultType="com.caac.house.project.vo.ConsultantVo">
+        SELECT su.ID_ userId,su.LOGO_ userLogo,su.NAME_ userName,IFNULL(SUM(sp.ARRIVE_),0) arriveTime,
+		TRUNCATE((SUM(sp.ARRIVE_)/SUM(sp.SEND_))*100,0) arriveRate,IFNULL(SUM(sp.BARGAIN_),0) bargain,
+		TRUNCATE((SUM(sp.BARGAIN_)/SUM(sp.SEND_))*100,0) bargainRate,IFNULL(SUM(sp.SCORE_),0) score,
+		IFNULL(SUM(sp.MONERY_),0) bargainMonery,so.rank
+		FROM FCJ_USER su
+		LEFT JOIN SALES_PERFORMANCE sp ON su.ID_ = sp.SALES_
+		LEFT JOIN (
+			SELECT 
+			sf.SALES_,
+			(
+			SELECT COUNT(0) + 1
+			FROM (
+				SELECT sr.SALES_,SUM(sr.MONERY_) total,sr.SCORE_ score
+				FROM SALES_PERFORMANCE sr 
+				GROUP BY sr.SALES_
+			) a 
+			WHERE CASE WHEN a.total = sf.total THEN a.score > sf.score ELSE a.total > sf.total END
+			) AS rank 
+			FROM (
+				SELECT se.SALES_,SUM(se.MONERY_) total,se.SCORE_ score,se.MONERY_
+				FROM SALES_PERFORMANCE se 
+				WHERE se.SALES_ = #{0}
+			) sf
+		) so ON so.SALES_ = sp.SALES_
+		WHERE su.ID_ = #{0} AND su.STATUS_ = '0'
+		GROUP BY su.ID_
+    </select>
+    
+    <!-- 获取经纪人对置业顾问评论 -->
+    <select id="getEvaluate" parameterType="com.caac.house.project.vo.UserEvaluatePageVo" 
+        resultType="com.caac.house.project.vo.UserEvaluateVo">
+        SELECT note,osStatus,score,phone,time,userLogo,userName FROM (
+			SELECT 
+				oe.NOTE_ note,
+				os.OS_STATUS_ osStatus,
+				oe.SCORE_ score,
+				INSERT(bu.PHONE_,4,4,'****') phone,
+				oe.TIME_ time,
+				bu.LOGO_ userLogo,
+				bu.NAME_ userName
+				FROM ORDER_EVALUATE oe
+				LEFT JOIN ORDER_SUPERVISOR os ON oe.LINK_ID_ = os.ID_
+				LEFT JOIN PROJECT_RECOMMEND pr ON pr.ID_ = os.RECOMMEND_
+				LEFT JOIN BROKER_USER bu ON bu.ID_ = pr.BROKER_ID_
+				WHERE os.USER_ = #{userId}
+			UNION ALL
+		 	SELECT 
+				oe.NOTE_ note,
+				5 osStatus,
+				oe.SCORE_ score,
+				INSERT(bu.PHONE_,4,4,'****') phone,
+				oe.TIME_ time,
+				bu.LOGO_ userLogo,
+				bu.NAME_ userName
+				FROM ORDER_EVALUATE oe
+				LEFT JOIN MAKE_BARGAIN os ON oe.LINK_ID_ = os.ID_
+				LEFT JOIN PROJECT_RECOMMEND pr ON pr.ID_ = os.RECOMMEND_
+				LEFT JOIN BROKER_USER bu ON bu.ID_ = pr.BROKER_ID_
+				WHERE os.USER_ = #{userId}
+		) a
+		<where>
+		    <if test="osStatus == 0">
+		        a.osStatus IN (0,2)
+		    </if>
+		    <if test="osStatus == 1">
+		        a.osStatus = '1'
+		    </if>
+		    <if test="osStatus == 4">
+		        a.osStatus = '4'
+		    </if>
+		    <if test="osStatus == 5">
+		        a.osStatus = '5'
+		    </if>
+		</where>
+		ORDER BY TIME DESC
+    </select>
+    
+    <!-- 获取指定置业顾问信息 -->
+    <select id="getUserInfo" resultType="com.caac.house.project.vo.UserExtVo">
+    	SELECT su.ID_ id, su.NAME_ name, su.PHONE_ mobile, proj.DAY_RECOMMEND_ dayRecommend  
+		FROM FCJ_USER su 
+		LEFT JOIN PROJECT proj ON proj.GROUP_ = su.DEPT_ AND proj.ID_ = #{1} 
+		WHERE su.STATUS_ = '0' AND su.ID_ = #{0} 
+    </select>
+    
+    <!-- 获取指定楼盘的置业顾问聊天列表 -->
+    <select id="getSalesToChatByProj" parameterType="com.caac.house.project.vo.UserByChatListVo" 
+        	resultType="com.caac.house.project.vo.UserByChatVo">
+		SELECT su.ID_ id, su.NAME_ name, c.TIME_ time, c.CONTENT_ content, su.LOGO_ logo, su.PHONE_ mobile  
+		FROM FCJ_USER su
+		LEFT JOIN (SELECT USER_, TIME_, CONTENT_ 
+        	FROM (SELECT USER_, TIME_, CONTENT_ 
+            	FROM IM_BROKER_USER 
+                WHERE BROKER_ = #{brokerId}  
+                ORDER BY TIME_ DESC) b  
+            GROUP BY USER_) c ON c.USER_ = su.ID_ 
+		WHERE su.SALES_TYPE_ = '2' AND su.DEPT_ = #{groups} AND su.STATUS_ = '0'
+	</select>
+</mapper>

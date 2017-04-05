@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.message.dao.MessageDao">
+
+	<!-- 获取消息信息 -->
+	<select id="getMessage" parameterType="com.caac.house.message.vo.MessageVo" resultType="com.caac.house.message.entity.ReceiveMessage">
+		SELECT TIME_ time, CONTENT_ content, TYPE_ type, '1' flag   
+		FROM IM_BROKER_USER 
+		WHERE USER_ = #{user} AND BROKER_ = #{broker}
+		ORDER BY TIME_ DESC  
+		LIMIT ${index},${length} 
+	</select>
+	
+	<!-- 添加交谈消息 -->
+	<insert id="insertMessage" parameterType="com.caac.house.message.entity.ImBrokerUser">
+		INSERT INTO IM_BROKER_USER(ID_, BROKER_, USER_, TIME_, CONTENT_, TYPE_, STATUS_)
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{broker}, #{user}, 
+			#{time}, #{content}, #{type}, #{status})	
+	</insert>
+	
+	<!-- 更新未读交谈消息状态 -->
+	<update id="updateUnread">
+		UPDATE IM_BROKER_USER SET STATUS_ = '1' WHERE USER_ = #{0} AND BROKER_ = #{1} AND TYPE_ = #{2} 
+	</update>
+	
+</mapper>

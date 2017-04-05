@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context" 
+	xmlns:websocket="http://www.springframework.org/schema/websocket"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/websocket 
+		http://www.springframework.org/schema/websocket/spring-websocket.xsd
+		http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd">
+
+	<bean id="websocket" class="com.caac.house.message.handler.MessageEndPoint"/>
+	
+	<websocket:handlers>
+		<websocket:mapping handler="websocket" path="/chat/socket.do"/>
+		<websocket:handshake-interceptors>
+			<bean class="com.caac.house.message.handler.HandInterceptor"></bean>
+		</websocket:handshake-interceptors>
+	</websocket:handlers>
+	
+	<!--MapperScannerConfigurer配置-->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="sqlSessionFactoryBeanName" value="defaultSqlSessionFactory" />
+		<property name="basePackage" value="com.caac.house.message"/>
+	</bean>
+	
+	<!-- 组件扫描 -->
+	<context:component-scan base-package="com.caac.house.message" />
+	
+</beans>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.project.dao.EvaluateDao">
+
+	<!-- 添加推荐跟单服务评价 -->
+	<insert id="insertEvaluate" parameterType="com.caac.house.project.entity.OrderEvaluate">
+		INSERT INTO ORDER_EVALUATE(ID_, RECOMMEND_,LINK_ID_,LINK_TYPE_, TIME_, SCORE_, NOTE_,ATTITUDE_,EFFICIENCY_,SPECIALTY_) 
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{recommend}, #{linkId}, #{linkType}, NOW(), #{score}, 
+			#{note}, #{attitude}, #{efficiency}, #{specialty})
+	</insert>
+	
+	<!-- 查询推荐跟单服务评价 -->
+	<select id="findEvaluate" resultType="com.caac.house.project.vo.EvaluateNoteVo">
+		SELECT oe.ID_ id, oe.LINK_ID_ linkId, oe.TIME_ TIME, oe.SCORE_ score, oe.NOTE_ note,oe.ATTITUDE_ attitude,
+			oe.EFFICIENCY_ efficiency,oe.SPECIALTY_ specialty
+		FROM ORDER_EVALUATE oe
+		WHERE oe.LINK_ID_ = #{linkId}
+	</select>
+	
+	<!-- 添加推荐跟单服务评价回复 -->
+	<insert id="insertEvaluateReply" parameterType="com.caac.house.project.entity.EvaluateReply">
+		INSERT INTO EVALUATE_REPLY(ID_, EVALUATE_ID_, REPLY_, NOTE_, TIME_)
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{evaluateId}, #{reply}, #{note}, NOW())
+	</insert>
+
+	<!-- 修改推荐跟单服务评价回复 -->
+	<update id="updateEvaluateReply" parameterType="com.caac.house.project.entity.EvaluateReply">
+		UPDATE EVALUATE_REPLY SET NOTE_ = #{note}, TIME_ = NOW()  
+		WHERE ID_ = #{Id}
+	</update>
+	
+	<!-- 查询推荐跟单服务评价回复 -->
+	<select id="findEvaluateReply" resultType="com.caac.house.project.entity.EvaluateReply">
+		SELECT ID_ id, EVALUATE_ID_ evaluateId, REPLY_ reply, NOTE_ note, TIME_ time 
+		FROM EVALUATE_REPLY 
+		WHERE EVALUATE_ID_ = #{0}
+	</select>
+	
+	<!-- 删除推荐跟单服务评价回复 -->
+	<delete id="delEvaluateReply">
+		DELETE FROM EVALUATE_REPLY WHERE ID_ = #{0}
+	</delete>
+	
+	<!-- 根据跟单ID获取楼盘ID和销售人员ID -->
+	<select id="findOrderInfo" resultType="com.caac.house.project.vo.OrderInfoVo">
+		SELECT pr.PROJECT_ID_ projectId,so.SUPERVISOR_ userId
+		FROM PROJECT_RECOMMEND pr,SEND_ORDERS so
+		WHERE pr.ID_ = so.RECOMMEND_ AND pr.ID_ = #{0}
+		UNION
+		SELECT pr.PROJECT_ID_ projectId,mb.USER_ userId
+		FROM PROJECT_RECOMMEND pr,MAKE_BARGAIN mb
+		WHERE pr.ID_ = mb.RECOMMEND_ AND pr.ID_ = #{0}
+	</select>
+	
+	<!-- 获取销售人员业绩ID -->
+	<select id="findPerformance" parameterType="com.caac.house.project.vo.OrderInfoVo" 
+	    resultType="com.caac.house.project.entity.SalesPerformance">
+		SELECT ID_ id, PROJECT_ID_ projectId, SALES_ sales, SCORE_ score, BARGAIN_ bargain, BROKER_SCORE_ brokerScore, 
+			BROKER_COUNT_ brokerCount  
+		FROM SALES_PERFORMANCE 
+		WHERE PROJECT_ID_ = #{projectId} AND SALES_ = #{userId}
+	</select>
+	
+	<!-- 添加销售人员业绩 -->
+	<insert id="insertPerformance" parameterType="com.caac.house.project.entity.SalesPerformance">
+		INSERT INTO SALES_PERFORMANCE(ID_, PROJECT_ID_, SALES_, SCORE_, BARGAIN_, BROKER_SCORE_, BROKER_COUNT_)
+		VALUES (#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{projectId}, #{sales}, #{score}, #{bargain}, 
+		#{brokerScore}, #{brokerCount})
+	</insert>
+	
+	<!-- 更新销售人员业绩 -->
+	<update id="updatePerformance" parameterType="com.caac.house.project.entity.SalesPerformance">
+		UPDATE SALES_PERFORMANCE 
+		SET SCORE_ = #{score}, BROKER_SCORE_ = #{brokerScore}, BROKER_COUNT_ = #{brokerCount} 
+		WHERE ID_ = #{id}
+	</update>
+	
+	<!-- 获取指定评论的置业顾问信息 -->
+	<select id="getUserByEvaluate" resultType="com.caac.house.project.vo.EvaluateUserVo">
+	    SELECT su.NAME_ userName,su.LOGO_ userLogo,
+		CASE WHEN os.TIME_ IS NULL THEN mb.TIME_ ELSE os.TIME_ END orderTime,
+		CASE WHEN os.TIME_ IS NULL THEN mb.ANALYZE_ ELSE os.CONTENT_ END content
+		FROM FCJ_USER su 
+		LEFT JOIN ORDER_SUPERVISOR os ON os.USER_ = su.ID_ AND os.ID_ = #{0}
+		LEFT JOIN MAKE_BARGAIN mb ON mb.USER_ = su.ID_ AND mb.ID_ = #{0}
+		WHERE su.ID_ = #{1}
+	</select>
+</mapper>

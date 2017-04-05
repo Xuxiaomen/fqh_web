@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:p="http://www.springframework.org/schema/p" 
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"  
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc.xsd
+        http://www.springframework.org/schema/tx 
+		http://www.springframework.org/schema/tx/spring-tx.xsd
+		http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd">
+
+	<!-- 加载配置文件 -->
+  	<bean class="com.kernle.engine.ext.PropertyPlaceholderConfigurerExt"> 
+		<property name="locations" > 
+        	<list>
+        	    <value>classpath:conf.properties</value>
+        	    <value>classpath:sms.properties</value>
+        	</list> 
+    	</property> 
+	</bean>
+	
+	<bean id="configEntity" class="com.kernle.engine.entity.ConfigEntity">
+		<property name="appid" value="${weixin.appid}"/>
+		<property name="appsecret" value="${weixin.appsecret}"/>
+		<property name="appUrlRoot" value="${weixin.appUrlRoot}"/>
+		<property name="oauth2RedirectUrl" value="${weixin.oauth2RedirectUrl}"/>
+		<property name="prefixAccessToken" value="${weixin.prefixAccessToken}"/>
+		<property name="prefixTicket" value="${weixin.prefixTicket}"/>
+		<property name="qrcodeTicket" value="${weixin.qrcodeTicket}"/>		
+		<property name="prefixBrokerSession" value="${weixin.prefixBrokerSession}"/>
+		<property name="prefixSalesSession" value="${weixin.prefixSalesSession}"/>
+		<property name="prefixSignature" value="${weixin.prefixSignature}"/>
+		<property name="prefixTimestamp" value="${weixin.prefixTimestamp}"/>
+		<property name="prefixNonce" value="${weixin.prefixNonce}"/>
+		<property name="accessToken" value="${weixin.accessToken}"/>
+		<property name="jsapiTicket" value="${weixin.jsapiTicket}"/>
+		<property name="oauth2" value="${weixin.oauth2}"/>
+		<property name="oauth2Code" value="${weixin.oauth2Code}"/>
+		<property name="menuCreate" value="${weixin.menuCreate}"/>
+		<property name="menuGet" value="${weixin.menuGet}"/>
+		<property name="userInfo" value="${weixin.userInfo}"/>
+		<property name="openId" value="${weixin.openId}"/>
+	</bean>
+	
+  	<!-- 定义数据源 -->
+  	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+    	<!-- JDBC参数赋值 -->
+    	<property name="url" value="${jdbc.url}"/>
+    	<property name="username" value="${jdbc.username}"/>
+    	<property name="password" value="${jdbc.password}"/>
+    	<!-- 配置初始化大小、最小、最大 -->
+    	<property name="initialSize" value="5"/>
+    	<property name="minIdle" value="5"/>
+    	<property name="maxActive" value="100"/>
+    	<!-- 配置获取连接等待超时的时间 -->
+    	<property name="maxWait" value="60000"/>
+    	<!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+    	<property name="timeBetweenEvictionRunsMillis" value="60000"/>
+    	<!-- 配置一个连接在池中最小生存的时间，单位是毫秒-->
+    	<property name="minEvictableIdleTimeMillis" value="300000"/>
+    	
+    	<property name="validationQuery" value="SELECT 'x'"/>
+    	<property name="testWhileIdle" value="true"/>
+    	<property name="testOnBorrow" value="false"/>
+    	<property name="testOnReturn" value="false"/>
+    	
+    	<!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+    	<property name="poolPreparedStatements" value="false"/>
+    	<property name="maxPoolPreparedStatementPerConnectionSize" value="20"/>
+    	
+    	<!-- 配置监控统计拦截的filters -->
+    	<property name="filters" value="stat"/>  
+  	</bean>
+	
+  	<!-- 事务管理 -->
+  	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    	<property name="dataSource" ref="dataSource"/>
+  	</bean>
+	
+	<!-- 事务配置 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="find*" read-only="true" />
+			<tx:method name="get*" read-only="true" />
+			<tx:method name="page*" read-only="true" />
+			<tx:method name="count*" read-only="true" />
+			<tx:method name="query*" read-only="true" />
+			<tx:method name="list*" read-only="true" />
+			<tx:method name="grid*" read-only="true" />
+			<tx:method name="load*" read-only="true" />
+			<tx:method name="*" />
+		</tx:attributes>
+	</tx:advice>
+	
+	<aop:config expose-proxy="true">
+		<aop:pointcut id="txPointcut" expression="execution(public * com..*.*Service.*(..))" />
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="txPointcut" />
+	</aop:config>
+	
+	<bean id="throwsAdvice" class="com.kernle.engine.ext.ExceptionAdvisor"/>
+	
+	<aop:config expose-proxy="true">
+		<aop:pointcut id="exPointcut" expression="execution(public * com..*.*Controller.*(..))" />
+		<aop:advisor advice-ref="throwsAdvice" pointcut-ref="exPointcut" />
+	</aop:config>
+		
+  	<!-- 定义Mybatis -->
+  	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    	<property name="configLocation" value="classpath:mybatis-config.xml"/>
+    	<property name="dataSource" ref="dataSource"/>
+    	<property name="mapperLocations">
+    		<list>
+    			<value>classpath*:META-INF/mapper/*.xml</value>
+    		</list>
+    	</property>  
+  	</bean>
+  	
+  	<!--MapperScannerConfigurer配置-->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+		<property name="basePackage" value="com.caac.house"/>
+	</bean>
+	        
+    <!-- 组件扫描 -->
+	<context:component-scan base-package="com.kernle.engine" />
+        
+	<!-- Redis配置 -->
+	<bean id="poolConfig" class="redis.clients.jedis.JedisPoolConfig">
+		<property name="maxIdle" value="${redis.maxIdle}"/>
+		<property name="maxActive" value="${redis.maxActive}"/>
+		<property name="maxWait" value="${redis.maxWait}"/>
+		<property name="testOnBorrow" value="${redis.testOnBorrow}"/>
+	</bean>
+	
+	<bean id="jedisConnectionFactory" class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory" 
+		p:host-name="${redis.host}" p:port="${redis.port}" p:password="${redis.password}" p:pool-config-ref="poolConfig" />
+	
+	<bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate">
+		<property name="connectionFactory" ref="jedisConnectionFactory" />
+		<property name="keySerializer">
+			<bean class="org.springframework.data.redis.serializer.StringRedisSerializer" />
+		</property>
+		<property name="valueSerializer">
+			<bean class="org.springframework.data.redis.serializer.JdkSerializationRedisSerializer" />
+		</property>
+	</bean>
+	
+	<!-- 对模型视图名称的解析，在请求时模型视图名称添加前后缀 -->
+	<bean id="viewResolver" class="org.springframework.web.servlet.view.InternalResourceViewResolver" p:prefix="/" p:suffix=".jsp" />
+	
+	<!-- 配置jackson过滤掉NULL、将日期格式化为yyyy-MM-dd HH:mm:ss -->
+	<bean id="jacksonObjectMapper" class="com.fasterxml.jackson.databind.ObjectMapper">
+		<property name="serializationInclusion">
+			<value type="com.fasterxml.jackson.annotation.JsonInclude.Include">NON_NULL</value>
+		</property>
+		<property name="dateFormat">
+			<value type="java.text.SimpleDateFormat">yyyy-MM-dd HH:mm:ss</value>
+		</property>
+	</bean>
+	
+	<!-- 读取国际化资源配置文件 -->
+	<bean id="messageSource" class="org.springframework.context.support.ResourceBundleMessageSource">
+		<property name="basename" value="resources/message_cn.properties"></property>
+		<property name="defaultEncoding" value="UTF-8"/>
+	</bean>
+	
+	<!-- 添加验证对国际化的支持 -->
+	<bean id="validator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean">
+		<property name="validationMessageSource" ref="messageSource"></property>
+	</bean>
+	
+	<!-- 处理在类级别上的@RequestMapping注解 -->	
+	<bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping" />
+	
+	<!-- 处理方法级别上的@RequestMapping注解 -->
+	<bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter">
+		<property name="messageConverters">
+			<list> 
+				<bean class="org.springframework.http.converter.StringHttpMessageConverter">
+					<property name="supportedMediaTypes">
+						<list>
+							<value>application/json;charset=UTF8</value>
+							<value>text/plain;charset=UTF8</value>
+						</list>
+					</property>
+				</bean>
+				<bean class="org.springframework.http.converter.ByteArrayHttpMessageConverter">
+					<property name="supportedMediaTypes">
+						<list>
+							<value>application/json;charset=UTF8</value>
+							<value>text/plain;charset=UTF8</value>
+						</list>
+					</property>
+				</bean>
+				<bean class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+					<property name="objectMapper" ref="jacksonObjectMapper" />
+					<property name="supportedMediaTypes">
+						<list>
+							<value>application/json;charset=UTF-8</value>
+							<value>text/plain;charset=UTF-8</value>
+						</list>
+					</property>
+				</bean>
+			</list>
+		</property>
+		<property name="webBindingInitializer">
+			<bean class="com.kernle.engine.web.CustomBindingInitializer">
+				<property name="autoGrowCollectionLimit" value="10000" />
+				<property name="validator" ref="validator" />
+			</bean>
+		</property>
+		<property name="customArgumentResolvers">
+			<list>
+				<bean class="com.kernle.engine.web.UserInfoResolver" />
+			</list>
+		</property>
+	</bean>
+	
+	<mvc:default-servlet-handler/>
+	
+	<mvc:interceptors>
+		<mvc:interceptor>
+			<mvc:mapping path="/**"/>
+			<mvc:exclude-mapping path="/weixin.do"/>
+			<mvc:exclude-mapping path="/menu/**"/>
+			<mvc:exclude-mapping path="/weixin/**"/>
+			<mvc:exclude-mapping path="/broker/login.do"/>
+			<mvc:exclude-mapping path="/broker/sendCode.do"/>
+			<mvc:exclude-mapping path="/broker/register.do"/>
+			<mvc:exclude-mapping path="/broker/updatePassword.do"/>
+			<mvc:exclude-mapping path="/broker/file.do"/>
+			<mvc:exclude-mapping path="/recommend/invite.do"/>
+			<mvc:exclude-mapping path="/broker/getConfirm.do"/>
+			<mvc:exclude-mapping path="/message/send.do"/>		
+			<bean class="com.kernle.engine.web.VerifyInterceptor">
+				<property name="enabled" value="true"/>
+			</bean>
+		</mvc:interceptor>
+	</mvc:interceptors>
+		
+	<!-- jsonMapper json转换工具类 -->
+	<bean id="jsonMapper" class="com.kernle.engine.utils.JsonMapper"/>
+	
+	<!-- ContextHelper工具 -->
+	<bean id="contextHelper" class="com.kernle.engine.web.ContextHelper"/>
+</beans>

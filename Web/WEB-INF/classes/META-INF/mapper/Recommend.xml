@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.caac.house.broker.dao.RecommendDao">
+	
+	<!-- 判断是否已经存在相同的手机号码 -->
+	<select id="getExistPhone" parameterType="java.lang.String" resultType="java.lang.Integer">
+		<![CDATA[
+			SELECT COUNT(0) FROM BROKER_RECOMMEND WHERE PHONE_ = #{phone} AND STATUS_ = '0' AND NUM_ < 6
+		]]>		
+	</select>
+	
+	<!-- 获取荐客信息 -->
+	<select id="getInfo" parameterType="java.lang.String" resultType="com.caac.house.broker.entity.Recommend">
+		SELECT ID_ id, BROKER_ID_ brokerId, NAME_ name, PHONE_ phone, PWD_ pwd, APPLY_TIME_ applyTime, CONFIG_TIME_ configTime 
+		FROM BROKER_RECOMMEND
+		WHERE ID_ = #{id}
+	</select>
+	
+	<!-- 添加到经纪人表 -->
+	<insert id="appendBroker" parameterType="com.caac.house.system.entity.BrokerUser">
+		INSERT INTO BROKER_USER (ID_, PID_, NAME_, PHONE_, PWD_, SOURCE_, STATUS_, RECOMMEND_, RECOMMEND_TIME_, REGISTER_TIME_) 
+		VALUES (#{id}, #{pid}, #{name}, #{phone}, #{pwd}, #{source}, #{status}, #{recommend}, #{recommendTime}, NOW())
+	</insert>
+	
+	<!-- 荐客确认 -->
+	<update id="config" parameterType="java.lang.String">
+		UPDATE BROKER_RECOMMEND SET CONFIG_TIME_ = NOW(), STATUS_ = '1' WHERE ID_ = #{id}
+	</update>
+	
+	<!-- 荐客页面数据 -->
+	<select id="getConfirmInfo" resultType="com.caac.house.broker.vo.ConfirmInfoVo">
+		SELECT bu.NAME_ userName,br.NAME_ recommendName,bu.PHONE_ userPhone,br.PHONE_ recommendPhone,br.APPLY_TIME_ applyTime,
+		DATE_ADD(br.APPLY_TIME_,INTERVAL 1 DAY) outTime
+		FROM broker_recommend br 
+		LEFT JOIN broker_user bu ON br.BROKER_ID_ = bu.ID_
+		WHERE br.ID_ = #{0}
+	</select>
+	
+	<!-- 荐客申请 -->
+	<insert id="apply" parameterType="com.caac.house.broker.entity.Recommend">
+		INSERT INTO BROKER_RECOMMEND(ID_, BROKER_ID_, NAME_, PHONE_, PWD_, STATUS_, APPLY_TIME_) 
+		VALUES(#{id,typeHandler=com.kernle.engine.handler.UUIDTypeHandler}, #{brokerId}, #{name}, #{phone}, #{pwd}, '0', NOW())
+	</insert>
+	
+	<!-- 判断经纪人是否存在 -->
+	<select id="getBroker" resultType="java.lang.Integer">
+		SELECT COUNT(0) FROM BROKER_USER WHERE ID_ = #{0} OR PHONE_ = #{1}
+	</select>
+	
+	<!-- 我的客户 -->
+	<select id="getClient" parameterType="com.caac.house.broker.vo.ClientPageVo" 
+		resultType="com.caac.house.broker.vo.ClientVo">
+	    SELECT pr.NAME_ NAME, pr.PHONE_ phone, IFNULL(SUM(mb.total),0) total, IFNULL(SUM(mb.AREA),0) AREA, 
+			IFNULL(SUM(md.MONERY_),0) monery
+		FROM PROJECT_RECOMMEND pr
+		LEFT JOIN (
+			SELECT mb.RECOMMEND_,mb.AREA_ area,COUNT(0) total 
+			FROM MAKE_BARGAIN mb 
+			GROUP BY mb.RECOMMEND_) mb ON pr.ID_ = mb.RECOMMEND_ AND pr.RECOMMEND_STATUS_ = '3'
+		LEFT JOIN HOUSE_MONERY hm ON hm.BROKER_ID_ = pr.BROKER_ID_
+		LEFT JOIN MONERY_DETAILS md ON pr.ID_ = md.RECOMMEND_ AND md.TYPE_ = '2' AND hm.ID_ = md.MASTER_ID_ 
+		WHERE pr.BROKER_ID_ = #{id}
+		GROUP BY pr.NAME_, pr.PHONE_
+	</select>
+	
+	<!-- 批量新增推荐 -->
+	<insert id="batchInsertApply" parameterType="java.util.List">
+	    INSERT INTO BROKER_RECOMMEND(ID_,BROKER_ID_, NAME_, PHONE_, PWD_, STATUS_, APPLY_TIME_) 
+		VALUES 
+		<foreach collection="list" item="item" index="index" separator=",">
+		    (#{item.id},#{item.brokerId}, #{item.name}, #{item.phone}, #{item.pwd}, '0', NOW())
+		</foreach>
+	</insert> 
+	
+	<!-- 获取经纪人购房成交套数 -->
+	<select id="getBargainCount" resultType="java.lang.Integer">
+		SELECT COUNT(0) total  
+		FROM MAKE_BARGAIN mb 
+        JOIN PROJECT_RECOMMEND pr ON mb.RECOMMEND_ = pr.ID_ 
+        WHERE mb.STATUS_ = '1' AND pr.BROKER_ID_ = #{0} OR pr.BROKER_ID_ IN (
+            SELECT ID_
+            FROM BROKER_USER bu
+            WHERE bu.PID_ = #{0} 
+            UNION
+            SELECT bu.ID_ 
+            FROM BROKER_USER bu
+            JOIN BROKER_USER buc ON buc.ID_ = bu.PID_
+            WHERE buc.PID_ = #{0} 
+        ) 
+	</select>
+	
+</mapper>
