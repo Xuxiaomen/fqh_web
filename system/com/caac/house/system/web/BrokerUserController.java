@@ -84,6 +84,13 @@ public class BrokerUserController {
 		return brokerUserService.config(request);
 	}
 	
+	/**
+	 * @Title: sendCode
+	 * @Description: 发送短信验证码
+	 * @param vo
+	 * @param request
+	 * @return
+	 */
 	@RequestMapping(value="/sendCode", method=RequestMethod.POST)
 	@ResponseBody
 	public RespMessage sendCode(SendCodeVo vo, HttpServletRequest request){
